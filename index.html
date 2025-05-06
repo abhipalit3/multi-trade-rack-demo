@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Parametric Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+  </style>
+
+  <!-- Import map – tells the browser where to find "three" and its addons -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <!-- Main script lives in a separate file -->
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
