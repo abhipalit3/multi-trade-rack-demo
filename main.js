@@ -25,9 +25,9 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('white');
 
-const axesHelper = new THREE.AxesHelper( 6 );
-axesHelper.setColors(new THREE.Color( 'blue' ), new THREE.Color( 'green' ), new THREE.Color( 'red' ));
-scene.add( axesHelper );
+// const axesHelper = new THREE.AxesHelper( 6 );
+// axesHelper.setColors(new THREE.Color( 'blue' ), new THREE.Color( 'green' ), new THREE.Color( 'red' ));
+// scene.add( axesHelper );
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
 camera.position.set(6, 4, 2);
@@ -41,15 +41,57 @@ scene.environment = new THREE.PMREMGenerator(renderer)
   .fromScene(new RoomEnvironment(), 0.05).texture;
 
 /* ---------- materials ---------- */
-const steelMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 1, roughness: 0.25 });
-const shellMat = new THREE.MeshStandardMaterial({ color: 0xbcbcbc, side: THREE.DoubleSide, metalness: 0, roughness: 0.9 });
-const ductMat  = new THREE.MeshStandardMaterial({ color: 0xa0a0a0, metalness: 0.15, roughness: 0.75 });
+const steelMat = new THREE.MeshStandardMaterial({ 
+  color: 0x777777, 
+  metalness: 1, 
+  roughness: 0.25 
+});
+
+const wallMaterial = new THREE.MeshStandardMaterial({
+  color: '#e0e0e0',
+  metalness: 0.1,
+  roughness: 0.7,
+  transparent: true, 
+  opacity: 0.4
+});
+
+const ceilingMaterial = new THREE.MeshStandardMaterial({
+  color: '#f5f5f5',
+  metalness: 0.2,
+  roughness: 0.6,
+  transparent: true,
+  opacity: 0.4
+});
+
+const floorMaterial = new THREE.MeshStandardMaterial({
+  color: '#d6d6d6',
+  metalness: 0.05,
+  roughness: 0.85
+});
+
+const roofMaterial = new THREE.MeshStandardMaterial({
+  color: '#bdbdbd',
+  metalness: 0.3,
+  roughness: 0.4,
+  transparent: true,
+  opacity: 0.4
+});
+
+const ductMat  = new THREE.MeshStandardMaterial({ 
+  color: 0xa0a0a0, 
+  metalness: 0.15, 
+  roughness: 0.7,
+});
 
 /* ---------- parameters ---------- */
 const params = {
   corridorWidth : 10,
   corridorHeight: 15,
   ceilingHeight : 9,
+
+  ceilingDepth : 2,
+  slabDepth  : 2,
+  wallThickness: 2,
 
   bayCount : 4,
   bayWidth : 3,
@@ -212,7 +254,6 @@ return g;
  *  * front & back walls   (XZ‑planes)
  */
 function buildShell(p){
-  const mat = p.material ?? shellMat;
   const s   = new THREE.Group();
 
   /* -- metric dimensions -------------------------------------------------- */
@@ -222,31 +263,33 @@ function buildShell(p){
   const ceilM   = ft2m(p.ceilingHeight);
 
   /* -- reusable geometries ------------------------------------------------- */
-  const slabGeom = new THREE.PlaneGeometry(lenM, widthM);   // XY‑plane
-  const wallGeom = new THREE.PlaneGeometry(lenM, heightM);  // XZ‑plane
+  const slabGeom = new THREE.BoxGeometry(lenM, widthM * 2, in2m(p.slabDepth));   // XY‑plane
+  const ceilingGeom = new THREE.BoxGeometry(lenM, widthM, in2m(p.ceilingDepth));         // XY‑plane
+  const wallGeom = new THREE.BoxGeometry(lenM, heightM, in2m(p.wallThickness));  // XZ‑plane
 
   /* -- horizontal slabs ---------------------------------------------------- */
-  const floor = new THREE.Mesh(slabGeom, mat);
+  const floor = new THREE.Mesh(slabGeom, floorMaterial);
+  floor.position.y = in2m(p.slabDepth)/2;                     // floor at Y=0
   floor.rotation.x = -Math.PI/2;            // make it horizontal
   s.add(floor);
 
-  const ceiling = new THREE.Mesh(slabGeom, mat);
+  const ceiling = new THREE.Mesh(ceilingGeom, ceilingMaterial);
   ceiling.rotation.x = -Math.PI/2;
-  ceiling.position.y = ceilM;
+  ceiling.position.y = ceilM - in2m(p.ceilingDepth)/2; // ceiling at Y=ceilM
   s.add(ceiling);
 
-  const roof = new THREE.Mesh(slabGeom, mat);
+  const roof = new THREE.Mesh(slabGeom, roofMaterial);
   roof.rotation.x =  Math.PI/2;
-  roof.position.y = heightM;
+  roof.position.y = heightM + in2m(p.slabDepth)/2; // roof at Y=heightM
   s.add(roof);
 
   /* -- vertical walls ------------------------------------------------------ */
   const dz = widthM/2;
-  const back = new THREE.Mesh(wallGeom, mat);
+  const back = new THREE.Mesh(wallGeom, wallMaterial);
   back.position.set(0, heightM/2, -dz);
   s.add(back);
 
-  const front = new THREE.Mesh(wallGeom, mat);
+  const front = new THREE.Mesh(wallGeom, wallMaterial);
   front.rotation.y = Math.PI;              // flip normal inward
   front.position.set(0, heightM/2,  dz);
   s.add(front);
