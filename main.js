@@ -25,9 +25,9 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('white');
 
-// const axesHelper = new THREE.AxesHelper( 6 );
-// axesHelper.setColors(new THREE.Color( 'blue' ), new THREE.Color( 'green' ), new THREE.Color( 'red' ));
-// scene.add( axesHelper );
+const axesHelper = new THREE.AxesHelper( 6 );
+axesHelper.setColors(new THREE.Color( 'blue' ), new THREE.Color( 'green' ), new THREE.Color( 'red' ));
+scene.add( axesHelper );
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
 camera.position.set(6, 4, 2);
