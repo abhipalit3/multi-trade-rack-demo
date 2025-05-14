@@ -1,6 +1,3 @@
-/* ------------------------------------------------------------
-   main.js — rack with tier‑constrained duct (beam‑accurate)
-   ------------------------------------------------------------ */
 import * as THREE              from 'three';
 import { OrbitControls }       from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment }     from 'three/addons/environments/RoomEnvironment.js';
