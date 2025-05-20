@@ -229,3 +229,49 @@ export function buildDuct(p, ductMat){
   );
   return duct;
 }
+
+/* ------------------------------------------------------------
+   buildPipes() – circular pipes running along rack length (X)
+   ------------------------------------------------------------ */
+
+/* =========================================================================
+   buildPipesFlexible()
+   -------------------------------------------------------------------------
+   • tierIdx  : 1-based tier index
+   • pipes[]  : [{ diamIn, sideOffIn, vertOffIn }, …]   (one entry per pipe)
+   • pipeMat  : material
+   ========================================================================= */
+export function buildPipesFlexible(p, tierIdx, pipes, pipeMat){
+  // accept {diam,side,vert} (GUI)  or  {diamIn,sideOffIn,vertOffIn}
+  const normalise = o => ({
+    diamIn     : o.diamIn     ?? o.diam,
+    sideOffIn  : o.sideOffIn  ?? o.side,
+    vertOffIn  : o.vertOffIn  ?? o.vert
+  });
+
+  pipes = pipes.map(normalise);
+  const lenM   = ft2m(p.bayCount * p.bayWidth) + in2m(4); // small overhang
+  const beamM  = in2m(p.beamSize);
+
+  /* Y = top of bottom beam + user vertical offset */
+  const beamTopY = bottomBeamCenterY(p, tierIdx) + beamM / 2;
+
+  const g = new THREE.Group();
+
+  pipes.forEach(({ diamIn, sideOffIn, vertOffIn })=>{
+    const rM   = in2m(diamIn) / 2;
+    const geom = new THREE.CylinderGeometry(rM, rM, lenM, 32);
+    geom.rotateZ(Math.PI/2);                 // cylinder axis → X
+
+    const mesh = new THREE.Mesh(geom, pipeMat);
+    mesh.position.set(
+      0,
+      beamTopY + in2m(vertOffIn),
+      in2m(sideOffIn)
+    );
+    g.add(mesh);
+  });
+
+  return g;
+}
+
