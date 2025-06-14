@@ -37,7 +37,7 @@ controls.target.set(0.805, 2.284, 0.339);
 controls.update();
 
 scene.environment = new THREE.PMREMGenerator(renderer)
-  .fromScene(new RoomEnvironment(), 0.05).texture;
+  .fromScene(new RoomEnvironment(), 0.1).texture;
 
 /* ---------- camera logger ---------- */
 function logCamera () {
@@ -56,10 +56,41 @@ window.addEventListener('keydown', e => {
 });
 
 /* ---------- materials ---------- */
+const texLoader = new THREE.TextureLoader();
+
+// Example URLs – replace with your own texture files if needed
+const floorAlbedo = texLoader.load('./textures/Floor-Roof/Wood066_1K-JPG_Color.jpg');
+const floorNormal = texLoader.load('./textures/Floor-Roof/Wood066_1K-JPG_NormalGL.jpg');
+const floorRough  = texLoader.load('./textures/Floor-Roof/Wood066_1K-JPG_Roughness.jpg');
+
+
+[floorAlbedo, floorNormal, floorRough].forEach(tex => {
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(8, 8); // controls tiling frequency
+});
+
+const floorMaterial = new THREE.MeshStandardMaterial({
+  map: floorAlbedo,
+  normalMap: floorNormal,
+  roughnessMap: floorRough,
+  metalness: 0.2,
+  roughness: 1.0
+});
+
+// const roofMaterial = new THREE.MeshStandardMaterial({
+//   map: floorAlbedo,
+//   normalMap: floorNormal,
+//   roughnessMap: floorRough,
+//   metalness: 0.2,
+//   roughness: 1.0,
+//   transparent: true, 
+//   opacity: 0.4 
+// });
+
 const steelMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 1, roughness: 0.25 });
 const wallMaterial = new THREE.MeshStandardMaterial({ color: '#e0e0e0', metalness: 0.1, roughness: 0.7, transparent: true, opacity: 0.4 });
 const ceilingMaterial = new THREE.MeshStandardMaterial({ color: '#f5f5f5', metalness: 0.2, roughness: 0.6, transparent: true, opacity: 0.4 });
-const floorMaterial = new THREE.MeshStandardMaterial({ color: '#d6d6d6', metalness: 0.05, roughness: 0.85 });
+// const floorMaterial = new THREE.MeshStandardMaterial({ color: '#d6d6d6', metalness: 0.05, roughness: 0.85 });
 const roofMaterial = new THREE.MeshStandardMaterial({ color: '#bdbdbd', metalness: 0.3, roughness: 0.4, transparent: true, opacity: 0.4 });
 const ductMat = new THREE.MeshStandardMaterial({ color: '#d05e8f', metalness: 0.50, roughness: 0.9, transparent: true, opacity: 1 });
 
@@ -69,8 +100,8 @@ const params = {
   corridorHeight : 15,
   ceilingHeight  : 9,
   ceilingDepth   : 2,
-  slabDepth      : 2,
-  wallThickness  : 2,
+  slabDepth      : 4,
+  wallThickness  : 6,
 
   bayCount  : 4,
   bayWidth  : 3,

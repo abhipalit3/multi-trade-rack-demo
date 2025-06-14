@@ -167,7 +167,7 @@ export function buildShell(p, wallMaterial, ceilingMaterial, floorMaterial, roof
 
   /* -- horizontal slabs ---------------------------------------------------- */
   const floor = new THREE.Mesh(slabGeom, floorMaterial);
-  floor.position.y = in2m(p.slabDepth)/2;                     // floor at Y=0
+  floor.position.y = -in2m(p.slabDepth)/2;                     // floor at Y=0
   floor.rotation.x = -Math.PI/2;            // make it horizontal
   s.add(floor);
 
@@ -182,7 +182,7 @@ export function buildShell(p, wallMaterial, ceilingMaterial, floorMaterial, roof
   s.add(roof);
 
   /* -- vertical walls ------------------------------------------------------ */
-  const dz = widthM/2;
+  const dz = widthM/2 + in2m(p.wallThickness/2); 
   const back = new THREE.Mesh(wallGeom, wallMaterial);
   back.position.set(0, heightM/2, -dz);
   s.add(back);
