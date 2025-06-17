@@ -230,19 +230,28 @@ export function buildDuct(p, ductMat){
   return duct;
 }
 
-/* ------------------------------------------------------------
-   buildPipes() – circular pipes running along rack length (X)
-   ------------------------------------------------------------ */
-
 /* =========================================================================
    buildPipesFlexible()
    -------------------------------------------------------------------------
-   • tierIdx  : 1-based tier index
-   • pipes[]  : [{ diamIn, sideOffIn, vertOffIn }, …]   (one entry per pipe)
-   • pipeMat  : material
+   Builds one or more circular pipes per tier, oriented along the X-axis.
+
+   • tierIdx   : 1-based index of the tier the pipes belong to
+   • pipes[]   : array of pipe descriptors; each pipe has:
+                   - diamIn     : diameter (inches)
+                   - sideOffIn  : horizontal offset (inches, along Z)
+                   - vertOffIn  : vertical offset from bottom beam (inches)
+   • pipeMat   : THREE.Material instance for the pipes
+
+   Pipes are positioned:
+   - Vertically: from the top of the bottom beam in the tier,
+     plus the specified `vertOffIn`, plus `radius` so they rest on their base.
+   - Clamped vertically to stay within the tier (avoids pipe poking outside).
+   - Horizontally centered and offset by `sideOffIn` (left-right).
+
+   Returns:
+   - A THREE.Group containing all pipe meshes for the tier.
    ========================================================================= */
-export function buildPipesFlexible(p, tierIdx, pipes, pipeMat){
-  // accept {diam,side,vert} (GUI)  or  {diamIn,sideOffIn,vertOffIn}
+export function buildPipesFlexible(p, tierIdx, pipes, pipeMat) {
   const normalise = o => ({
     diamIn     : o.diamIn     ?? o.diam,
     sideOffIn  : o.sideOffIn  ?? o.side,
@@ -250,28 +259,38 @@ export function buildPipesFlexible(p, tierIdx, pipes, pipeMat){
   });
 
   pipes = pipes.map(normalise);
-  const lenM   = ft2m(p.bayCount * p.bayWidth) + in2m(4); // small overhang
-  const beamM  = in2m(p.beamSize);
 
-  /* Y = top of bottom beam + user vertical offset */
-  const beamTopY = bottomBeamCenterY(p, tierIdx) + beamM / 2;
+  const lenM  = ft2m(p.bayCount * p.bayWidth) + in2m(4); // pipe length (X-axis) with slight overhang
+  const beamM = in2m(p.beamSize);
 
   const g = new THREE.Group();
 
-  pipes.forEach(({ diamIn, sideOffIn, vertOffIn })=>{
-    const rM   = in2m(diamIn) / 2;
+  // Compute vertical bounds of the tier
+  const tierHeightM  = ft2m(p.tierHeights[tierIdx - 1]);      // clear height of tier
+  const tierBottomY  = bottomBeamCenterY(p, tierIdx) + beamM / 2;
+  const tierTopY     = tierBottomY + tierHeightM;
+
+  pipes.forEach(({ diamIn, sideOffIn, vertOffIn }) => {
+    const rM = in2m(diamIn) / 2;
     const geom = new THREE.CylinderGeometry(rM, rM, lenM, 32);
-    geom.rotateZ(Math.PI/2);                 // cylinder axis → X
+    geom.rotateZ(Math.PI / 2); // X-axis pipe
+
+    // Position Y: bottom beam top + user offset + radius
+    let y = tierBottomY + in2m(vertOffIn) + rM;
+
+    // Clamp within tier
+    const maxY = tierTopY - rM;
+    const minY = tierBottomY + rM;
+    y = THREE.MathUtils.clamp(y, minY, maxY);
 
     const mesh = new THREE.Mesh(geom, pipeMat);
     mesh.position.set(
-      0,
-      beamTopY + in2m(vertOffIn),
-      in2m(sideOffIn)
+      0,              // X (centered)
+      y,              // Y (adjusted)
+      in2m(sideOffIn) // Z
     );
     g.add(mesh);
   });
 
   return g;
 }
-

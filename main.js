@@ -32,12 +32,16 @@ function makeOrtho() {
 }
 const camera = makeOrtho();
 
+
+/* ---------- controls (orbit) ---------- */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0.805, 2.284, 0.339);
 controls.update();
 
+/* ---------- environment map (room) ---------- */
 scene.environment = new THREE.PMREMGenerator(renderer)
   .fromScene(new RoomEnvironment(), 0.1).texture;
+
 
 /* ---------- camera logger ---------- */
 function logCamera () {

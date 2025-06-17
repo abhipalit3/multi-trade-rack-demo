@@ -235,15 +235,21 @@ export function setupGUI(scene, p, camera, controls, mats){
           const sub = pf.addFolder(`Pipe ${pIdx+1}`);
 
           const dC = sub.add(pipeObj,'diam',1,24).name('Diameter (in)')
-                        .onFinishChange(()=>{ refreshTierLimits(tIdx); rebuildScene(); });
+                      .onFinishChange(() => {
+                        refreshTierLimits(tIdx);
+                        // 👇 Recalculate and update vert offset limit
+                        const vMaxNew = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)) - pipeObj.diam);
+                        vC.max(vMaxNew).updateDisplay();
+                        rebuildScene();
+                    });
 
           const lim = sideLimit(pipeObj.diam);
           const oC = sub.add(pipeObj,'side',-lim,lim).name('Side offset (in)')
                         .onFinishChange(rebuildScene);
 
-          const vMax = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)));
+          const vMax = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)) - pipeObj.diam);
           const vC = sub.add(pipeObj,'vert',0,vMax).name('Vert offset (in)')
-                        .onFinishChange(rebuildScene);
+                      .onFinishChange(rebuildScene);
 
           pipeCtrls[tIdx][pIdx] = { d:dC, o:oC, v:vC };
           sub.open(false);
