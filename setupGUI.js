@@ -15,9 +15,7 @@ import {
 export let guiInstance = null;
 export let controllerMap = {};
 
-/**
- * Ensure that all per-tier arrays exist on `p`.
- */
+/** Ensure per-tier arrays exist */
 function ensureArrays(p) {
   if (!Array.isArray(p.tierHeights))  p.tierHeights  = [];
   if (!Array.isArray(p.ductEnabled))  p.ductEnabled  = [];
@@ -28,75 +26,36 @@ function ensureArrays(p) {
   if (!Array.isArray(p.pipesPerTier)) p.pipesPerTier = [];
 }
 
-/**
- * Resize or trim per-tier arrays to exactly `p.tierCount` entries.
- */
+/** Trim or grow per-tier arrays to match p.tierCount */
 function syncArrays(p) {
   const n = p.tierCount;
-  while (p.tierHeights.length < n)  p.tierHeights.push(2);
-  p.tierHeights.length = n;
-
-  while (p.ductEnabled.length < n)  p.ductEnabled.push(false);
-  while (p.ductWidths .length < n)  p.ductWidths .push(18);
-  while (p.ductHeights.length < n)  p.ductHeights.push(16);
-  while (p.ductOffsets.length < n)  p.ductOffsets.push(0);
-  p.ductEnabled.length = p.ductWidths.length = p.ductHeights.length = p.ductOffsets.length = n;
-
-  while (p.pipeEnabled.length < n)  p.pipeEnabled.push(false);
+  while (p.tierHeights .length < n) p.tierHeights .push(2);
+  while (p.ductEnabled .length < n) p.ductEnabled .push(false);
+  while (p.ductWidths  .length < n) p.ductWidths  .push(18);
+  while (p.ductHeights .length < n) p.ductHeights .push(16);
+  while (p.ductOffsets .length < n) p.ductOffsets .push(0);
+  while (p.pipeEnabled .length < n) p.pipeEnabled .push(false);
   while (p.pipesPerTier.length < n) p.pipesPerTier.push([{ diam:4, side:0, vert:4 }]);
-  p.pipeEnabled.length = p.pipesPerTier.length = n;
+  p.tierHeights .length =
+  p.ductEnabled .length =
+  p.ductWidths  .length =
+  p.ductHeights .length =
+  p.ductOffsets .length =
+  p.pipeEnabled .length =
+  p.pipesPerTier.length = n;
 }
 
-/**
- * The main entrypoint. Call once from your main.js.
- * Returns a `rebuildScene()` callback which you can also pass to your chat interface.
- */
 export function setupGUI(scene, params, camera, controls, mats) {
-  // 1) GUI root
   guiInstance = new GUI({ width: 380 });
   const gui = guiInstance;
 
-  // 2) Guarantee data-model
+  // 1) Ensure data‐model
   ensureArrays(params);
   syncArrays(params);
 
-  // 3) Tier‐folder builder (recreated on every tierCount change)
-  let tiersFolder = null;
-  function buildTierUI() {
-    if (tiersFolder) tiersFolder.destroy();
-    tiersFolder = gui.addFolder('Tiers');
-
-    const n = params.tierCount;
-    // syncArrays has already run, so arrays are length n
-    for (let i = 0; i < n; i++) {
-      const tf = tiersFolder.addFolder(`Tier ${i+1}`);
-
-      // Height slider
-      controllerMap[`tierHeight_${i}`] = tf
-        .add(params.tierHeights, i, 1, 6)
-        .name('Height (ft)')
-        .onChange(rebuildScene);
-
-      // Duct toggle
-      controllerMap[`ductEnabled_${i}`] = tf
-        .add(params.ductEnabled, i)
-        .name('Has duct')
-        .onChange(rebuildScene);
-
-      // Pipes toggle
-      controllerMap[`pipeEnabled_${i}`] = tf
-        .add(params.pipeEnabled, i)
-        .name('Has pipes')
-        .onChange(rebuildScene);
-
-      tf.open();
-    }
-    tiersFolder.open();
-  }
-
-  // 4) 3D rebuild function
+  // 2) The rebuildScene closure
   function rebuildScene() {
-    // dispose old generated
+    // dispose old
     scene.children.slice().forEach(o => {
       if (o.userData.isGenerated) {
         dispose(o);
@@ -105,25 +64,24 @@ export function setupGUI(scene, params, camera, controls, mats) {
     });
 
     // rack + shell
-    const rackObj  = buildRack(params, mats.steelMat);
-    const shellObj = buildShell(
+    const rack  = buildRack(params, mats.steelMat);
+    const shell = buildShell(
       params,
       mats.wallMaterial,
       mats.ceilingMaterial,
       mats.floorMaterial,
       mats.roofMaterial
     );
-    [rackObj, shellObj].forEach(g => {
+    [rack, shell].forEach(g => {
       g.userData.isGenerated = true;
       scene.add(g);
     });
 
     // ducts
-    const ductGroup = new THREE.Group();
-    ductGroup.userData.isGenerated = true;
-    params.ductEnabled.forEach((en, i) => {
+    const dg = new THREE.Group(); dg.userData.isGenerated = true;
+    params.ductEnabled.forEach((en,i) => {
       if (!en) return;
-      ductGroup.add(buildDuct({
+      dg.add(buildDuct({
         ...params,
         ductTier:   i+1,
         ductWidth:  params.ductWidths[i],
@@ -131,25 +89,54 @@ export function setupGUI(scene, params, camera, controls, mats) {
         ductOffset: params.ductOffsets[i]
       }, mats.ductMat));
     });
-    scene.add(ductGroup);
+    scene.add(dg);
 
     // pipes
-    const pipeGroup = new THREE.Group();
-    pipeGroup.userData.isGenerated = true;
-    params.pipeEnabled.forEach((en, i) => {
+    const pg = new THREE.Group(); pg.userData.isGenerated = true;
+    params.pipeEnabled.forEach((en,i) => {
       if (!en) return;
-      pipeGroup.add(buildPipesFlexible(
+      pg.add(buildPipesFlexible(
         params, i+1, params.pipesPerTier[i],
         new THREE.MeshStandardMaterial({ color:'#4eadff', metalness:0.3, roughness:0.6 })
       ));
     });
-    scene.add(pipeGroup);
+    scene.add(pg);
   }
 
-  // 5) Expose rebuildScene for controllers & chat
-  controllerMap._rebuildScene = rebuildScene;
+  // 3) Build the dynamic "Tiers" folder
+  let tiersFolder = null;
+  function buildTierUI() {
+    if (tiersFolder) tiersFolder.destroy();
+    tiersFolder = gui.addFolder('Tiers');
 
-  // 6) Top‐level controllers
+    // re-sync arrays
+    syncArrays(params);
+
+    params.tierHeights.forEach((_, idx) => {
+      const tf = tiersFolder.addFolder(`Tier ${idx+1}`);
+
+      controllerMap[`tierHeight_${idx}`] = tf
+        .add(params.tierHeights, idx, 1, 6)
+        .name('Height (ft)')
+        .onChange(rebuildScene);
+
+      controllerMap[`ductEnabled_${idx}`] = tf
+        .add(params.ductEnabled, idx)
+        .name('Has duct')
+        .onChange(rebuildScene);
+
+      controllerMap[`pipeEnabled_${idx}`] = tf
+        .add(params.pipeEnabled, idx)
+        .name('Has pipes')
+        .onChange(rebuildScene);
+
+      tf.open();
+    });
+
+    tiersFolder.open();
+  }
+
+  // 4) Top-level controls
   controllerMap.corridorWidth = gui
     .add(params, 'corridorWidth', 6, 40)
     .name('Corridor width (ft)')
@@ -198,17 +185,15 @@ export function setupGUI(scene, params, camera, controls, mats) {
   controllerMap.tierCount = gui
     .add(params, 'tierCount', 1, 10, 1)
     .name('Tier count')
-    .onChange(v => {
-      // whenever number of tiers changes:
-      syncArrays(params);    // adjust arrays to new length
-      buildTierUI();         // rebuild the "Tiers" folder
-      rebuildScene();        // rebuild geometry
+    .onChange(() => {
+      buildTierUI();
+      rebuildScene();
     });
 
-  // 7) initial build
+  // 5) Initial GUI + Scene build
   buildTierUI();
   rebuildScene();
 
-  // 8) return for external use
+  // Return for chat interface
   return rebuildScene;
 }
