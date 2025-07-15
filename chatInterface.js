@@ -31,7 +31,7 @@ export function initChatInterface(params, rebuildScene, updateGUI) {
 
   // Heading
   const title = document.createElement('h3');
-  title.textContent = 'configur. AI Assistant';
+  title.textContent = 'Configur. AI Assistant';
   Object.assign(title.style, {
     margin:       '0',
     padding:      '12px 8px',
@@ -63,6 +63,12 @@ export function initChatInterface(params, rebuildScene, updateGUI) {
     fontSize:     '0.9em'
   });
   container.appendChild(messages);
+// Starting prompt
+  const welcome = document.createElement('div');
+  welcome.style.marginBottom = '4px';
+  welcome.innerHTML = `<strong>Assistant:</strong> Hello! How can I help you configure your multi trade rack today?`;
+  messages.appendChild(welcome);
+
 
   // Input form
   const form = document.createElement('form');
@@ -70,11 +76,19 @@ export function initChatInterface(params, rebuildScene, updateGUI) {
   form.style.padding = '8px';
   container.appendChild(form);
 
-  const input = document.createElement('input');
+  const input = document.createElement('textarea');
   Object.assign(input.style, {
-    flex:        '1',
-    marginRight: '4px',
-    boxSizing:   'border-box'
+    flex:          '1',
+    marginRight:   '4px',
+    boxSizing:     'border-box',
+    height:        '40px',      // make it taller by default
+    minHeight:     '40px',      // ensure it starts at this height
+    maxHeight:     '300px',     // allow some vertical growth
+    padding:       '6px',       // inner padding
+    resize:        'vertical',  // user can drag to resize
+    overflowY:     'auto',      // show scrollbar when needed
+    fontFamily:    'inherit',   // match the rest of the UI
+    fontSize:      '0.9em'      // scale to match message font
   });
   input.placeholder = 'Describe your change…';
   form.appendChild(input);
