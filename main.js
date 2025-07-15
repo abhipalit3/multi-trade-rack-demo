@@ -141,17 +141,14 @@ const mats = {
 
 
 const rebuildScene = setupGUI(scene, params, camera, controls, mats);
-
-// Chat-driven slider-sync
-function updateGUI(updates) {
-  Object.entries(updates).forEach(([key, _]) => {
-    const ctrl = controllerMap[key];
-    if (ctrl) ctrl.updateDisplay();
+initChatInterface(params, rebuildScene, updates => {
+  // for each key in updates, if there’s a controller, setValue:
+  Object.entries(updates).forEach(([k,v]) => {
+    if (controllerMap[k]?.setValue) {
+      controllerMap[k].setValue(v);
+    }
   });
-}
-
-// Pass updateGUI to your chat interface
-initChatInterface(params, rebuildScene, updateGUI);
+});
 
 /* ---------- resize & render ---------- */
 addEventListener('resize', () => {
