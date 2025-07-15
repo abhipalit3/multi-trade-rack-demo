@@ -1,271 +1,269 @@
-/* ------------------------------------------------------------------
-   setupGUI.js  –  per-tier ducts and individually editable pipes
-   ------------------------------------------------------------------ */
-import GUI        from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
+// setupGUI.js
+
+import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 import * as THREE from 'three';
-import { ft2in, tierHeightFt, dispose,
-         buildRack, buildShell, buildDuct,
-         buildPipesFlexible } from './utils.js';
+import {
+  ft2in,
+  tierHeightFt,
+  dispose,
+  buildRack,
+  buildShell,
+  buildDuct,
+  buildPipesFlexible
+} from './utils.js';
 
-export function setupGUI(scene, p, camera, controls, mats){
-  const {
-    steelMat,
-    wallMaterial, ceilingMaterial, floorMaterial, roofMaterial,
-    ductMat
-  } = mats;
+// Exported handles
+export let controllerMap = {};
+let sceneRef, matsRef, pRef;
 
-  /* default pipe material */
-  const pipeMat = new THREE.MeshStandardMaterial({ color:'#4eadff', metalness:0.3, roughness:0.6 });
+// Top-level entrypoint: call this once in main.js
+export function setupGUI(scene, p, camera, controls, mats) {
+  // Keep refs for inner functions
+  sceneRef = scene;
+  matsRef  = mats;
+  pRef     = p;
 
-/* ────────────────────────────────────────────────────────
-   1 ◂ data-model guards
-   ──────────────────────────────────────────────────────── */
-  const ensureA = key => { if (!p[key]) p[key] = []; };
-  ['tierHeights',
-   'ductEnabled','ductWidths','ductHeights','ductOffsets',
-   'pipeEnabled','pipesPerTier'              /* array of arrays */
-  ].forEach(ensureA);
+  // Ensure per-tier arrays exist and match initial tierCount
+  ensureArrays(pRef);
+  syncArrays(pRef);
 
-  /* make sure arrays are long enough */
-  const grow = (arr,n,mk)=>{ while(arr.length<n) arr.push(mk()); arr.length=n; };
-  function syncArrays(){
-    const n = p.tierCount;
-    grow(p.tierHeights , n, ()=>2);
-
-    grow(p.ductEnabled , n, ()=>false);
-    grow(p.ductWidths  , n, ()=>18);
-    grow(p.ductHeights , n, ()=>16);
-    grow(p.ductOffsets , n, ()=>0);
-
-    grow(p.pipeEnabled , n, ()=>false);
-    grow(p.pipesPerTier, n, ()=>[{ diam:4, side:0, vert:4 }]); // at least one pipe
-  }
-  syncArrays();
-
-/* ────────────────────────────────────────────────────────
-   2 ◂ GUI root
-   ──────────────────────────────────────────────────────── */
+  // Create the GUI
   const gui = new GUI({ width: 380 });
-  gui.add({ logCamera(){
-    console.log(`camera.position.set(${camera.position.x.toFixed(3)}, ${camera.position.y.toFixed(3)}, ${camera.position.z.toFixed(3)});`);
-    console.log(`controls.target.set(${controls.target.x.toFixed(3)}, ${controls.target.y.toFixed(3)}, ${controls.target.z.toFixed(3)}); controls.update();`);
-  }}, 'logCamera').name('⇢ Log camera');
 
-/* ────────────────────────────────────────────────────────
-   3 ◂ scene rebuild
-   ──────────────────────────────────────────────────────── */
-  let rackObj, shellObj, ductGroup, pipeGroup;
+  // Build and wire all components
+  buildControllers(gui, pRef, camera, controls);
+  buildTierFolders(gui, pRef);
+  clampGlobals(pRef);
+  const rebuildScene = buildSceneRebuilder(sceneRef, pRef, matsRef);
 
-  function rebuildScene(){
-    if (rackObj)   { dispose(rackObj);   scene.remove(rackObj); }
-    if (shellObj)  { dispose(shellObj);  scene.remove(shellObj);}
-    if (ductGroup) { dispose(ductGroup); scene.remove(ductGroup);}
-    if (pipeGroup) { dispose(pipeGroup); scene.remove(pipeGroup);}
+  // Initial render
+  rebuildScene();
 
-    rackObj  = buildRack(p, steelMat);
-    shellObj = buildShell(p, wallMaterial, ceilingMaterial, floorMaterial, roofMaterial);
+  // Return callback for external code
+  return rebuildScene;
+}
 
-    /* ducts */
-    ductGroup = new THREE.Group();
-    p.ductEnabled.forEach((en,i)=>{
-      if (!en) return;
-      ductGroup.add(buildDuct({
-        ...p,
-        ductTier   : i+1,
-        ductWidth  : p.ductWidths [i],
-        ductHeight : p.ductHeights[i],
-        ductOffset : p.ductOffsets[i]
-      }, ductMat));
-    });
+/**
+ * Ensures all p[...] arrays exist.
+ */
+function ensureArrays(p) {
+  ['tierHeights','ductEnabled','ductWidths','ductHeights','ductOffsets','pipeEnabled','pipesPerTier']
+    .forEach(key => { if (!Array.isArray(p[key])) p[key] = []; });
+}
 
-    /* pipes */
-    pipeGroup = new THREE.Group();
-    p.pipeEnabled.forEach((en,i)=>{
-      if (!en) return;
-      pipeGroup.add(
-        buildPipesFlexible(p, i+1, p.pipesPerTier[i], pipeMat)
-      );
-    });
+/**
+ * Grows or shrinks p[...] arrays to match p.tierCount.
+ */
+function syncArrays(p) {
+  const n = p.tierCount;
+  while (p.tierHeights.length < n) p.tierHeights.push(2);
+  p.tierHeights.length = n;
 
-    scene.add(shellObj, rackObj, ductGroup, pipeGroup);
-  }
-
-/* ────────────────────────────────────────────────────────
-   4 ◂ helpers for limits
-   ──────────────────────────────────────────────────────── */
-  let depthCtrl, topCtrl;                 // filled later
-
-  const sideLimit = diamIn =>
-    ft2in(p.depth)/2 - p.postSize/2 - diamIn/2;
-
-  function refreshTierLimits(tIdx){
-    /* duct */
-    if (p.ductEnabled[tIdx]){
-      const hMax = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)));
-      ductCtrls[tIdx].h.max(hMax).updateDisplay();
-      p.ductHeights[tIdx] = Math.min(p.ductHeights[tIdx], hMax);
-
-      const wMax = Math.max(1, ft2in(p.depth) - p.postSize);
-      ductCtrls[tIdx].w.max(wMax).updateDisplay();
-      p.ductWidths[tIdx] = Math.min(p.ductWidths[tIdx], wMax);
-
-      const lim = sideLimit(p.ductWidths[tIdx]);
-      ductCtrls[tIdx].o.min(-lim).max(lim).updateDisplay();
-      p.ductOffsets[tIdx] = THREE.MathUtils.clamp(p.ductOffsets[tIdx], -lim, lim);
-    }
-
-    /* each pipe in this tier */
-    if (p.pipeEnabled[tIdx]){
-      p.pipesPerTier[tIdx].forEach((pipeObj, j)=>{
-        if (!pipeCtrls[tIdx] || !pipeCtrls[tIdx][j]) return;
-        const pc = pipeCtrls[tIdx][j];
-        const lim = sideLimit(pipeObj.diam);
-        pc.o.min(-lim).max(lim).updateDisplay();
-        pipeObj.side = THREE.MathUtils.clamp(pipeObj.side, -lim, lim);
-
-        const vMax = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)));
-        pc.v.max(vMax).updateDisplay();
-        pipeObj.vert = Math.min(pipeObj.vert, vMax);
-      });
-    }
-  }
-
-  function updateGlobals(){
-    /* top-clearance */
-    const minTop = Math.max(1, p.corridorHeight - p.ceilingHeight);
-    const maxTop = p.corridorHeight;
-    topCtrl.min(minTop).max(maxTop).updateDisplay();
-    p.topClearance = THREE.MathUtils.clamp(p.topClearance, minTop, maxTop);
-
-    /* depth */
-    depthCtrl.max(p.corridorWidth).updateDisplay();
-    p.depth = Math.min(p.depth, p.corridorWidth);
-
-    tierFolders.forEach((_,i)=>refreshTierLimits(i));
-  }
-
-/* ────────────────────────────────────────────────────────
-   5 ◂ global sliders
-   ──────────────────────────────────────────────────────── */
-  gui.add(p,'corridorWidth',6,40).name('Corridor width (ft)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-  gui.add(p,'corridorHeight',8,60).name('Corridor height (ft)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-  gui.add(p,'ceilingHeight',0,p.corridorHeight).name('Ceiling height (ft)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-  gui.add(p,'bayCount',1,10,1).name('Bay count').onFinishChange(rebuildScene);
-  gui.add(p,'bayWidth',1,30).name('Bay width (ft)').onFinishChange(rebuildScene);
-
-  depthCtrl = gui.add(p,'depth',1,p.corridorWidth).name('Rack depth (ft)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-  topCtrl   = gui.add(p,'topClearance',1,p.corridorHeight).name('Top clearance (ft)').onFinishChange(rebuildScene);
-
-  gui.add(p,'postSize',0.5,12).name('Post size (in)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-  gui.add(p,'beamSize',0.5,12).name('Beam size (in)').onFinishChange(()=>{updateGlobals();rebuildScene();});
-
-  gui.add(p,'tierCount',1,10,1).name('Tier count').onFinishChange(v=>{
-    syncArrays();
-    buildTierFolders();
-    rebuildScene();
+  ['ductEnabled','ductWidths','ductHeights','ductOffsets','pipeEnabled'].forEach(key => {
+    while (p[key].length < n) p[key].push(key==='ductEnabled'||key==='pipeEnabled'?false:18);
+    p[key].length = n;
   });
 
-/* ────────────────────────────────────────────────────────
-   6 ◂ tier folders
-   ──────────────────────────────────────────────────────── */
-  let tierFolders = [];              // GUI folder refs
-  let ductCtrls   = [];              // per-tier {w,h,o}
-  let pipeCtrls   = [];              // per-tier [ {d,o,v}, … ]
+  while (p.pipesPerTier.length < n) p.pipesPerTier.push([{ diam:4, side:0, vert:4 }]);
+  p.pipesPerTier.length = n;
+}
 
-  function buildTierFolders(){
-    /* clean out old folders */
-    tierFolders.forEach(f=>f.destroy());
-    tierFolders = [];
-    ductCtrls   = [];
-    pipeCtrls   = [];
-
-    p.tierHeights.forEach((_,tIdx)=>{
-      const tf = gui.addFolder(`Tier ${tIdx+1}`);
-      tierFolders[tIdx]=tf;
-
-      /* height slider */
-      tf.add(p.tierHeights, tIdx.toString(), 1, 6)
-        .name('Height (ft)').onFinishChange(()=>{ refreshTierLimits(tIdx); rebuildScene(); });
-
-      /* ───── duct toggle + folder ───── */
-      tf.add(p.ductEnabled, tIdx.toString()).name('Has duct')
-        .onChange(()=>{ buildTierFolders(); rebuildScene(); });
-
-      let dW,dH,dO;
-      if (p.ductEnabled[tIdx]){
-        const df = tf.addFolder('Duct');
-
-        dW = df.add(p.ductWidths, tIdx.toString(), 4, 48).name('Width (in)')
-              .onFinishChange(()=>{ refreshTierLimits(tIdx); rebuildScene(); });
-
-        dH = df.add(p.ductHeights,tIdx.toString(), 4, 48).name('Height (in)')
-              .onFinishChange(rebuildScene);
-
-        const lim = sideLimit(p.ductWidths[tIdx]);
-        dO = df.add(p.ductOffsets,tIdx.toString(), -lim, lim).name('Side offset (in)')
-              .onFinishChange(rebuildScene);
-
-        df.open(false);
+/**
+ * Builds the rack+shell+ducts+pipes and returns a function to rebuild on demand.
+ */
+function buildSceneRebuilder(scene, p, mats) {
+  return function rebuildScene() {
+    // Dispose previous
+    scene.children.slice().forEach(o => {
+      if (o.userData.generated) {
+        dispose(o);
+        scene.remove(o);
       }
-      ductCtrls[tIdx] = { w:dW,h:dH,o:dO };
-
-      /* ───── pipe toggle + folder ───── */
-      tf.add(p.pipeEnabled, tIdx.toString()).name('Has pipes')
-        .onChange(()=>{ buildTierFolders(); rebuildScene(); });
-
-      pipeCtrls[tIdx] = [];
-
-      if (p.pipeEnabled[tIdx]){
-        const pf = tf.addFolder('Pipes');
-
-        /* count spinner modifies array length */
-        pf.add({cnt:p.pipesPerTier[tIdx].length},'cnt')   // ← just a number box
-          .step(1)                                        // up/down arrows
-          .name('Count')
-          .onChange(n=>{
-            const arr = p.pipesPerTier[tIdx];
-            while(arr.length < n) arr.push({ diam:4, side:0, vert:4 });
-            arr.length = n;
-            buildTierFolders();
-            rebuildScene();
-          });
-
-        /* one sub-folder per pipe */
-        p.pipesPerTier[tIdx].forEach((pipeObj, pIdx)=>{
-          const sub = pf.addFolder(`Pipe ${pIdx+1}`);
-
-          const dC = sub.add(pipeObj,'diam',1,24).name('Diameter (in)')
-                      .onFinishChange(() => {
-                        refreshTierLimits(tIdx);
-                        // 👇 Recalculate and update vert offset limit
-                        const vMaxNew = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)) - pipeObj.diam);
-                        vC.max(vMaxNew).updateDisplay();
-                        rebuildScene();
-                    });
-
-          const lim = sideLimit(pipeObj.diam);
-          const oC = sub.add(pipeObj,'side',-lim,lim).name('Side offset (in)')
-                        .onFinishChange(rebuildScene);
-
-          const vMax = Math.max(1, ft2in(tierHeightFt(p, tIdx+1)) - pipeObj.diam);
-          const vC = sub.add(pipeObj,'vert',0,vMax).name('Vert offset (in)')
-                      .onFinishChange(rebuildScene);
-
-          pipeCtrls[tIdx][pIdx] = { d:dC, o:oC, v:vC };
-          sub.open(false);
-        });
-
-        pf.open(false);
-      }
-
-      tf.open(false);
     });
+
+    // Rack & shell
+    const rack  = buildRack(p, mats.steelMat);
+    const shell = buildShell(p, mats.wallMaterial, mats.ceilingMaterial, mats.floorMaterial, mats.roofMaterial);
+    [rack, shell].forEach(g => {
+      g.userData.generated = true;
+      scene.add(g);
+    });
+
+    // Ducts
+    const dg = new THREE.Group(); dg.userData.generated = true;
+    p.ductEnabled.forEach((en,i) => {
+      if (en) dg.add(buildDuct({
+        ...p,
+        ductTier:   i+1,
+        ductWidth:  p.ductWidths[i],
+        ductHeight: p.ductHeights[i],
+        ductOffset: p.ductOffsets[i]
+      }, mats.ductMat));
+    });
+    scene.add(dg);
+
+    // Pipes
+    const pg = new THREE.Group(); pg.userData.generated = true;
+    p.pipeEnabled.forEach((en,i) => {
+      if (en) pg.add(buildPipesFlexible(p, i+1, p.pipesPerTier[i],
+        new THREE.MeshStandardMaterial({ color:'#4eadff', metalness:0.3, roughness:0.6 })
+      ));
+    });
+    scene.add(pg);
+  };
+}
+
+/**
+ * Creates top-level controllers and stores them in controllerMap.
+ */
+function buildControllers(gui, p, camera, controls) {
+  controllerMap.corridorWidth = gui
+    .add(p, 'corridorWidth', 6, 40)
+    .name('Corridor width (ft)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  controllerMap.corridorHeight = gui
+    .add(p, 'corridorHeight', 8, 60)
+    .name('Corridor height (ft)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  controllerMap.ceilingHeight = gui
+    .add(p, 'ceilingHeight', 0, p.corridorHeight)
+    .name('Ceiling height (ft)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  controllerMap.bayCount = gui
+    .add(p, 'bayCount', 1, 10, 1)
+    .name('Bay count')
+    .onFinishChange(controllerMap._rebuildScene);
+
+  controllerMap.bayWidth = gui
+    .add(p, 'bayWidth', 1, 30)
+    .name('Bay width (ft)')
+    .onFinishChange(controllerMap._rebuildScene);
+
+  controllerMap.depth = gui
+    .add(p, 'depth', 1, p.corridorWidth)
+    .name('Rack depth (ft)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  controllerMap.topClearance = gui
+    .add(p, 'topClearance', 1, p.corridorHeight)
+    .name('Top clearance (ft)')
+    .onFinishChange(controllerMap._rebuildScene);
+
+  controllerMap.postSize = gui
+    .add(p, 'postSize', 0.5, 12)
+    .name('Post size (in)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  controllerMap.beamSize = gui
+    .add(p, 'beamSize', 0.5, 12)
+    .name('Beam size (in)')
+    .onFinishChange(() => { clampGlobals(p); controllerMap._rebuildScene(); });
+
+  // tierCount needs to rebuild folders and scene
+  controllerMap.tierCount = gui
+    .add(p, 'tierCount', 1, 10, 1)
+    .name('Tier count')
+    .onFinishChange(v => {
+      syncArrays(p);
+      buildTierFolders(gui, p);
+      clampGlobals(p);
+      controllerMap._rebuildScene();
+    });
+}
+
+/**
+ * Builds (or rebuilds) all per-tier GUI folders.
+ */
+function buildTierFolders(gui, p) {
+  // Remove old
+  if (controllerMap._tierFolders) {
+    controllerMap._tierFolders.forEach(f => f.destroy());
+  }
+  const folders = [];
+  const ductCtrls = [];
+  const pipeCtrls = [];
+
+  for (let t = 0; t < p.tierCount; t++) {
+    const tf = gui.addFolder(`Tier ${t+1}`);
+    folders.push(tf);
+
+    // Tier height
+    tf.add(p.tierHeights, t.toString(), 1, 6)
+      .name('Height (ft)')
+      .onFinishChange(() => { refreshTierLimits(t); controllerMap._rebuildScene(); });
+
+    // Duct toggle
+    tf.add(p.ductEnabled, t.toString())
+      .name('Has duct')
+      .onChange(() => { buildTierFolders(gui,p); controllerMap._rebuildScene(); });
+
+    let dW, dH, dO;
+    if (p.ductEnabled[t]) {
+      const df = tf.addFolder('Duct');
+      dW = df.add(p.ductWidths,  t.toString(), 4, 48)
+              .name('Width (in)')
+              .onFinishChange(() => { refreshTierLimits(t); controllerMap._rebuildScene(); });
+      dH = df.add(p.ductHeights, t.toString(), 4, 48)
+              .name('Height (in)')
+              .onFinishChange(() => { controllerMap._rebuildScene(); });
+      const lim = ft2in(p.depth)/2 - p.postSize/2 - p.ductWidths[t]/2;
+      dO = df.add(p.ductOffsets, t.toString(), -lim, lim)
+              .name('Side offset (in)')
+              .onFinishChange(() => { controllerMap._rebuildScene(); });
+      df.open(false);
+    }
+    ductCtrls[t] = { w:dW, h:dH, o:dO };
+
+    // Pipe toggle
+    tf.add(p.pipeEnabled, t.toString())
+      .name('Has pipes')
+      .onChange(() => { buildTierFolders(gui,p); controllerMap._rebuildScene(); });
+
+    pipeCtrls[t] = [];
+    if (p.pipeEnabled[t]) {
+      const pf = tf.addFolder('Pipes');
+      pf.add({cnt: p.pipesPerTier[t].length}, 'cnt')
+        .step(1)
+        .name('Count')
+        .onChange(n => {
+          const arr = p.pipesPerTier[t];
+          while (arr.length < n) arr.push({diam:4,side:0,vert:4});
+          arr.length = n;
+          buildTierFolders(gui,p);
+          controllerMap._rebuildScene();
+        });
+      p.pipesPerTier[t].forEach((o,j) => {
+        const sub = pf.addFolder(`Pipe ${j+1}`);
+        const dC = sub.add(o, 'diam',1,24).name('Diameter (in)')
+                   .onFinishChange(() => { refreshTierLimits(t); controllerMap._rebuildScene(); });
+        const lim = ft2in(p.depth)/2 - p.postSize/2 - o.diam/2;
+        const oC = sub.add(o, 'side', -lim,lim). name('Side offset (in)').onFinishChange(controllerMap._rebuildScene);
+        const vMax = Math.max(1, ft2in(tierHeightFt(p,t+1)));
+        const vC = sub.add(o, 'vert',0,vMax).name('Vert offset (in)').onFinishChange(controllerMap._rebuildScene);
+        pipeCtrls[t][j] = {d:dC,o:oC,v:vC};
+        sub.open(false);
+      });
+      pf.open(false);
+    }
+
+    tf.open(false);
   }
 
-/* ────────────────────────────────────────────────────────
-   7 ◂ initial rollout
-   ──────────────────────────────────────────────────────── */
-  buildTierFolders();
-  updateGlobals();
-  rebuildScene();
+  controllerMap._tierFolders = folders;
+}
+
+/**
+ * Clamp the global sliders to their valid ranges.
+ */
+function clampGlobals(p) {
+  const minTop = Math.max(1, p.corridorHeight - p.corridorHeight);
+  const maxTop = p.corridorHeight;
+  controllerMap.topClearance.min(minTop).max(maxTop).updateDisplay();
+  p.topClearance = THREE.MathUtils.clamp(p.topClearance, minTop, maxTop);
+
+  controllerMap.depth.max(p.corridorWidth).updateDisplay();
+  p.depth = Math.min(p.depth, p.corridorWidth);
 }

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { dispose } from './utils.js';
-import { setupGUI } from './setupGUI.js';
+import { setupGUI, controllerMap } from './setupGUI.js';
+import { initChatInterface } from './chatInterface.js';
 
 /* ---------- renderer / scene ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -125,15 +126,32 @@ const params = {
   ductOffsets  : [ 0,  0]  // in  (parallel array #4)
 };
 
-/* ---------- setup GUI (and build scene) ---------- */
-setupGUI(scene, params, camera, controls, {
+/* bundle materials into one object */
+const mats = {
   steelMat,
   wallMaterial,
   ceilingMaterial,
   floorMaterial,
   roofMaterial,
   ductMat
-});
+};
+
+/* ---------- setup GUI (and build scene) ---------- */
+// setupGUI(scene, params, camera, controls, mats);
+
+
+const rebuildScene = setupGUI(scene, params, camera, controls, mats);
+
+// Chat-driven slider-sync
+function updateGUI(updates) {
+  Object.entries(updates).forEach(([key, _]) => {
+    const ctrl = controllerMap[key];
+    if (ctrl) ctrl.updateDisplay();
+  });
+}
+
+// Pass updateGUI to your chat interface
+initChatInterface(params, rebuildScene, updateGUI);
 
 /* ---------- resize & render ---------- */
 addEventListener('resize', () => {
