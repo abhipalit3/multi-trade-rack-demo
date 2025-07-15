@@ -1,0 +1,107 @@
+/* app-navbar.css */
+.app-navbar-container {
+  width: 98%;
+  height: 60px;
+  display: flex;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fff;
+  z-index: 1000;
+  padding: 0 16px;
+  font-family: sans-serif;
+}
+
+.app-navbar-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+.app-navbar-navlink {
+  text-decoration: none;
+  font-size: 1.25em;
+  font-weight: bold;
+  color: #333;
+}
+
+.app-navbar-desktop-menu {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.app-navbar-desktop-menu a,
+.app-navbar-desktop-menu span {
+  color: #333;
+  text-decoration: none;
+  font-size: 0.95em;
+}
+
+.app-navbar-image {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.app-navbar-burger-menu {
+  display: none;
+  cursor: pointer;
+}
+
+.app-navbar-burger-menu svg {
+  width: 24px;
+  height: 24px;
+  fill: #333;
+}
+
+.app-navbar-mobile-menu {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 60px);
+  background: #fff;
+  padding: 24px;
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.app-navbar-mobile-menu.open {
+  display: flex;
+}
+
+.app-navbar-mobile-menu .close-btn {
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.app-navbar-mobile-menu nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-navbar-mobile-menu nav a {
+  color: #333;
+  text-decoration: none;
+  font-size: 1.1em;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .app-navbar-desktop-menu { display: none; }
+  .app-navbar-burger-menu { display: block; }
+}
+.lil-gui {
+  top: 80px !important;
+}
+
+.mobile-logo {
+  height: 32px;
+  margin-bottom: 16px;
+}

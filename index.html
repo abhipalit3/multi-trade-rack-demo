@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Parametric Viewer</title>
+
+  <!-- Nav CSS -->
+  <link rel="stylesheet" href="./app-navbar.css" />
+
   <style>
     body { margin: 0; overflow: hidden; }
   </style>
+
   <script type="importmap">
   {
     "imports": {
@@ -16,9 +21,45 @@
   }
   </script>
 </head>
-
 <body>
-  <!-- Main script lives in a separate file -->
+  <!-- ─── APP NAVBAR ───────────────────────────────────────────── -->
+  <div class="app-navbar-container">
+    <a href="/" class="app-navbar-navlink">
+      <img src="./logo.png" alt="Configur Logo" class="app-navbar-logo" />
+    </a>
+
+    <div class="app-navbar-desktop-menu">
+      <span>Office Building</span>
+      <a href="/projects">Projects</a>
+      <a href="/project-dashboard">Assemblies</a>
+      <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200"
+           alt="avatar"
+           class="app-navbar-image" />
+    </div>
+
+    <div class="app-navbar-burger-menu" id="burger">
+      <svg viewBox="0 0 1024 1024"><path d="M128 554.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667zM128 298.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667zM128 810.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667z"></path></svg>
+    </div>
+
+    <div class="app-navbar-mobile-menu" id="mobileMenu">
+      <div class="close-btn" id="closeBtn">&#10005;</div>
+      <nav>
+        <a href="/about">About</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/team">Team</a>
+        <a href="/blog">Blog</a>
+      </nav>
+      <div>
+        <button>Login</button>
+        <button>Register</button>
+      </div>
+    </div>
+  </div>
+  <!-- ───────────────────────────────────────────────────────────── -->
+
+  <!-- Your three.js app -->
+  <script src="./nav.js"></script>
   <script type="module" src="./main.js"></script>
 </body>
 </html>

@@ -14,10 +14,10 @@ export function initChatInterface(params, rebuildScene, updateGUI) {
   const container = document.createElement('div');
   Object.assign(container.style, {
     position:      'absolute',
-    bottom:        '20px',
-    right:         '20px',
+    top:           '80px',
+    left:          '40px',
     width:         '320px',
-    maxHeight:     '400px',
+    maxHeight:     '60vh',
     background:    'rgba(255,255,255,0.95)',
     border:        '1px solid #ccc',
     borderRadius:  '4px',
@@ -28,6 +28,18 @@ export function initChatInterface(params, rebuildScene, updateGUI) {
     boxShadow:     '0 2px 8px rgba(0,0,0,0.2)'
   });
   document.body.appendChild(container);
+
+  // Heading
+  const title = document.createElement('h3');
+  title.textContent = 'configur. AI Assistant';
+  Object.assign(title.style, {
+    margin:       '0',
+    padding:      '12px 8px',
+    fontSize:     '1.1em',
+    background:   '#f0f0f0',
+    borderBottom:'1px solid #ddd'
+  });
+  container.appendChild(title);
 
   // API key input
   const header = document.createElement('div');

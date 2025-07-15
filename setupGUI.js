@@ -47,6 +47,7 @@ function syncArrays(p) {
 
 export function setupGUI(scene, params, camera, controls, mats) {
   guiInstance = new GUI({ width: 380 });
+  
   const gui = guiInstance;
 
   // 1) Ensure data‐model
