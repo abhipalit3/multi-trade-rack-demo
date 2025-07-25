@@ -8,6 +8,14 @@ export const in2m  = inch => inch * IN2M;
 export const ft2in = ft   => ft   * 12;
 export const dispose = g => g.traverse(o => o.isMesh && o.geometry?.dispose());
 
+function addEdges(mesh, color = 0x333333, lineWidth = 0.5, opacity = 0.5) {
+  const geometry = new THREE.EdgesGeometry(mesh.geometry);
+  const material = new THREE.LineBasicMaterial({ color, linewidth: lineWidth });
+  material.opacity = opacity;
+  material.transparent = true;
+  const edges = new THREE.LineSegments(geometry, material);
+  mesh.add(edges);
+}
 
 /**
  * Build a parametric pallet‑rack frame and return it as a {@link THREE.Group}.
@@ -61,7 +69,7 @@ export function buildRack(p, steelMat){
   /* -- reusable geometries ------------------------------------------------- */
   const postGeom = new THREE.BoxGeometry(postM, totalH, postM);
   const longGeom = new THREE.BoxGeometry(lenM + postM, beamM, beamM);       // X beams
-  const tranGeom = new THREE.BoxGeometry(beamM, beamM, depthM + postM);     // Z beams
+  const tranGeom = new THREE.BoxGeometry(beamM, beamM, depthM - postM);     // Z beams
 
   /* -- vertical posts ---------------------------------------------------- */
   /* There are (bayCount + 1) frames along X and two frames (front/back) along Z. */
@@ -76,6 +84,7 @@ export function buildRack(p, steelMat){
         z                      // depth direction (back / front)
       );
       g.add(post);
+      addEdges(post); // add edges for visibility
     }
   }
 
@@ -102,6 +111,7 @@ const bottomLevel = Math.min(...levelList);  // lowest  beam elevation
     const rail = new THREE.Mesh(longGeom, mat);
     rail.position.set(0, y, z);
     g.add(rail);
+    addEdges(rail);
   });
 });
 
@@ -112,6 +122,7 @@ levelList.forEach(y => {
     const tr = new THREE.Mesh(tranGeom, mat);
     tr.position.set(x, y, 0);
     g.add(tr);
+    addEdges(tr);
   }
 });
 
@@ -155,7 +166,7 @@ export function buildShell(p, wallMaterial, ceilingMaterial, floorMaterial, roof
   const s   = new THREE.Group();
 
   /* -- metric dimensions -------------------------------------------------- */
-  const lenM    = ft2m(p.bayCount * p.bayWidth) + in2m(12); // little allowance
+  const lenM    = ft2m(p.bayCount * p.bayWidth); // little allowance
   const widthM  = ft2m(p.corridorWidth);
   const heightM = ft2m(p.corridorHeight);
   const ceilM   = ft2m(p.ceilingHeight);
@@ -170,27 +181,32 @@ export function buildShell(p, wallMaterial, ceilingMaterial, floorMaterial, roof
   floor.position.y = -in2m(p.slabDepth)/2;                     // floor at Y=0
   floor.rotation.x = -Math.PI/2;            // make it horizontal
   s.add(floor);
+  addEdges(floor, 0x333333, 0.5, 0.6);
 
   const ceiling = new THREE.Mesh(ceilingGeom, ceilingMaterial);
   ceiling.rotation.x = -Math.PI/2;
   ceiling.position.y = ceilM - in2m(p.ceilingDepth)/2; // ceiling at Y=ceilM
   s.add(ceiling);
+  addEdges(ceiling, 0x333333, 0.5, 0.1);
 
   const roof = new THREE.Mesh(slabGeom, roofMaterial);
   roof.rotation.x =  Math.PI/2;
   roof.position.y = heightM + in2m(p.slabDepth)/2; // roof at Y=heightM
   s.add(roof);
+  addEdges(roof, 0x333333, 0.5, 0.1);
 
   /* -- vertical walls ------------------------------------------------------ */
   const dz = widthM/2 + in2m(p.wallThickness/2); 
   const back = new THREE.Mesh(wallGeom, wallMaterial);
   back.position.set(0, heightM/2, -dz);
   s.add(back);
+  addEdges(back, 0x333333, 0.5, 0.1);
 
   const front = new THREE.Mesh(wallGeom, wallMaterial);
   front.rotation.y = Math.PI;              // flip normal inward
   front.position.set(0, heightM/2,  dz);
   s.add(front);
+  addEdges(front, 0x333333, 0.5, 0.1);
 
   return s;
 }

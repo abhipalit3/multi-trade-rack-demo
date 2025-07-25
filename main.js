@@ -4,45 +4,170 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { dispose } from './utils.js';
 import { setupGUI, controllerMap } from './setupGUI.js';
 import { initChatInterface } from './chatInterface.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
 
 /* ---------- renderer / scene ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
-renderer.setClearColor(0xf0f0f0);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.physicallyCorrectLights = true;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('white');
+scene.background = new THREE.Color(0xdbefff);
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+const gridSize = 100;
+const divisions = 100;
+
+const gridHelper = new THREE.GridHelper(gridSize, divisions, 0x000000, 0x000000);
+gridHelper.material.opacity = 0.15;
+gridHelper.material.transparent = true;
+gridHelper.material.depthWrite = false;
+gridHelper.renderOrder = -1;
+scene.add(gridHelper);
+
+function createBackgroundGrid(size = 1000, step = 10, color = 0x000000) {
+  const lines = [];
+
+  for (let i = -size; i <= size; i += step) {
+    lines.push(-size, 0, i, size, 0, i); // vertical
+    lines.push(i, 0, -size, i, 0, size); // horizontal
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(lines.flat(), 3)
+  );
+
+  const material = new THREE.LineBasicMaterial({
+    color,
+    opacity: 0.3,
+    transparent: true,
+    depthWrite: false
+  });
+
+  const lineSegments = new THREE.LineSegments(geometry, material);
+  lineSegments.renderOrder = -2;
+  scene.add(lineSegments);
+}
+createBackgroundGrid();
+
+function updateOrthoCamera(camera, viewHeight) {
+  const aspect = window.innerWidth / window.innerHeight;
+  const halfHeight = viewHeight / 2;
+  const halfWidth = halfHeight * aspect;
+
+  camera.left = -halfWidth;
+  camera.right = halfWidth;
+  camera.top = halfHeight;
+  camera.bottom = -halfHeight;
+  camera.updateProjectionMatrix();
+}
 
 /* ---------- camera (orthographic) ---------- */
-function makeOrtho() {
-  const aspect = innerWidth / innerHeight;
-  const frustumHeight = 12;
-  const frustumWidth = frustumHeight * aspect;
-  const cam = new THREE.OrthographicCamera(
-    -frustumWidth / 2, frustumWidth / 2,
-     frustumHeight / 2, -frustumHeight / 2,
-     0.1, 100
-  );
-  cam.position.set(-3.822, 3.848, -2.242);
-  cam.zoom = 1.5;
-  cam.updateProjectionMatrix();
-  return cam;
-}
-const camera = makeOrtho();
 
+const aspect = window.innerWidth / window.innerHeight;
+const d = 10; // distance from origin to camera
+const camera = new THREE.OrthographicCamera(
+  -d * aspect, // left
+  d * aspect,  // right
+  d,           // top
+  -d,          // bottom
+  0.01,           // near
+  100        // far
+);
+camera.zoom = 2; // initial zoom level
+// const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
 
-/* ---------- controls (orbit) ---------- */
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0.805, 2.284, 0.339);
+controls.minZoom = 1; // Minimum zoom level
+controls.maxZoom = 100;   // Maximum zoom level
+
+controls.keys = {
+	LEFT: 'ArrowLeft', //left arrow
+	UP: 'ArrowUp', // up arrow
+	RIGHT: 'ArrowRight', // right arrow
+	BOTTOM: 'ArrowDown' // down arrow
+}
+
+camera.position.set(9.238, 7.435, 6.181);
+camera.lookAt(0, 0, 0);
+controls.target.set(-1.731, 2.686, -1.376);
+
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,   // orbit
+  MIDDLE: THREE.MOUSE.DOLLY,  // zoom
+  RIGHT: THREE.MOUSE.PAN      // pan
+};
+
+let currentMode = 'default';
+
+window.addEventListener('keydown', (event) => {
+  switch (event.key.toLowerCase()) {
+    case 'p':
+      controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      currentMode = 'pan';
+      break;
+
+    case 'o':
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      currentMode = 'orbit';
+      break;
+
+    case 'escape':
+      controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN
+      };
+      currentMode = 'default';
+      break;
+  }
+
+  controls.update();
+});
+
+
 controls.update();
+
+const helper = new THREE.CameraHelper( camera );
+helper.matrixAutoUpdate = true;
+helper.setColors(
+  new THREE.Color(0xff0000), // frustum
+  new THREE.Color(0x00ff00), // cone
+  new THREE.Color(0x0000ff), // up
+  new THREE.Color(0xffff00), // target
+  new THREE.Color(0x00ffff)  // cross
+);
+// scene.add( helper );
+
+
 
 /* ---------- environment map (room) ---------- */
 scene.environment = new THREE.PMREMGenerator(renderer)
   .fromScene(new RoomEnvironment(), 0.1).texture;
 
+const transformControls = new TransformControls(camera, renderer.domElement);
+scene.add(transformControls);
+
+transformControls.attach(ductMesh); // Replace with your duct mesh
+transformControls.setMode('scale'); // or 'translate' or 'rotate'
+
+transformControls.addEventListener('dragging-changed', (event) => {
+  controls.enabled = !event.value; // Disable OrbitControls while interacting
+});
 
 /* ---------- camera logger ---------- */
 function logCamera () {
@@ -81,16 +206,6 @@ const floorMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.2,
   roughness: 1.0
 });
-
-// const roofMaterial = new THREE.MeshStandardMaterial({
-//   map: floorAlbedo,
-//   normalMap: floorNormal,
-//   roughnessMap: floorRough,
-//   metalness: 0.2,
-//   roughness: 1.0,
-//   transparent: true, 
-//   opacity: 0.4 
-// });
 
 const steelMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 1, roughness: 0.25 });
 const wallMaterial = new THREE.MeshStandardMaterial({ color: '#e0e0e0', metalness: 0.1, roughness: 0.7, transparent: true, opacity: 0.4 });
@@ -158,5 +273,7 @@ addEventListener('resize', () => {
 });
 (function animate() {
   requestAnimationFrame(animate);
+  controls.update();
+  updateOrthoCamera(camera, 20);
   renderer.render(scene, camera);
 })();
