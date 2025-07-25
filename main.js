@@ -159,15 +159,6 @@ helper.setColors(
 scene.environment = new THREE.PMREMGenerator(renderer)
   .fromScene(new RoomEnvironment(), 0.1).texture;
 
-const transformControls = new TransformControls(camera, renderer.domElement);
-scene.add(transformControls);
-
-transformControls.attach(ductMesh); // Replace with your duct mesh
-transformControls.setMode('scale'); // or 'translate' or 'rotate'
-
-transformControls.addEventListener('dragging-changed', (event) => {
-  controls.enabled = !event.value; // Disable OrbitControls while interacting
-});
 
 /* ---------- camera logger ---------- */
 function logCamera () {
