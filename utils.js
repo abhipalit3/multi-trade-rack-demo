@@ -230,7 +230,7 @@ export function bottomBeamCenterY(p, idx){
 export function buildDuct(p, ductMat){
   const lenM = ft2m(p.bayCount * p.bayWidth);
   const geom = new THREE.BoxGeometry(
-    lenM + in2m(4),
+    lenM + in2m(12), // length (X-axis) with slight overhang
     in2m(p.ductHeight),
     in2m(p.ductWidth)
   );
@@ -276,7 +276,7 @@ export function buildPipesFlexible(p, tierIdx, pipes, pipeMat) {
 
   pipes = pipes.map(normalise);
 
-  const lenM  = ft2m(p.bayCount * p.bayWidth) + in2m(4); // pipe length (X-axis) with slight overhang
+  const lenM  = ft2m(p.bayCount * p.bayWidth) + in2m(12); // pipe length (X-axis) with slight overhang
   const beamM = in2m(p.beamSize);
 
   const g = new THREE.Group();

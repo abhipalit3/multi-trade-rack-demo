@@ -5,7 +5,7 @@ import { dispose } from './utils.js';
 import { setupGUI, controllerMap } from './setupGUI.js';
 import { initChatInterface } from './chatInterface.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-
+import { ViewCube } from './viewcube.js';
 
 /* ---------- renderer / scene ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -18,6 +18,7 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdbefff);
+// scene.background = new THREE.Color(0xffffff);
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambient);
@@ -92,7 +93,9 @@ camera.zoom = 2; // initial zoom level
 // const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.minZoom = 1; // Minimum zoom level
+controls.enableDamping = true; // an animation effect
+controls.dampingFactor = 0.1; // how smooth the damping is
+controls.minZoom = 1.5; // Minimum zoom level
 controls.maxZoom = 100;   // Maximum zoom level
 
 controls.keys = {
@@ -159,6 +162,8 @@ helper.setColors(
 scene.environment = new THREE.PMREMGenerator(renderer)
   .fromScene(new RoomEnvironment(), 0.1).texture;
 
+const cameraHelper = new THREE.CameraHelper(dirLight.shadow.camera);
+scene.add(cameraHelper);
 
 /* ---------- camera logger ---------- */
 function logCamera () {
@@ -256,6 +261,26 @@ initChatInterface(params, rebuildScene, updates => {
   });
 });
 
+// ViewCube setup
+const viewCubeScene = new THREE.Scene();
+const viewCubeCamera = camera.clone();
+
+const viewCube = new ViewCube(5);
+viewCubeScene.add(viewCube);
+
+const viewCubeRenderer = new THREE.WebGLRenderer({ alpha: true });
+viewCubeRenderer.setSize(100, 100);
+viewCubeRenderer.setClearColor(0x000000, 0);
+
+viewCubeRenderer.setPixelRatio(window.devicePixelRatio);
+
+document.body.appendChild(viewCubeRenderer.domElement);
+
+viewCubeRenderer.domElement.style.position = 'absolute';
+viewCubeRenderer.domElement.style.left = '20px';
+viewCubeRenderer.domElement.style.bottom = '50px';
+viewCubeRenderer.domElement.style.zIndex = '1000';
+
 /* ---------- resize & render ---------- */
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -267,4 +292,12 @@ addEventListener('resize', () => {
   controls.update();
   updateOrthoCamera(camera, 20);
   renderer.render(scene, camera);
+
+  // Optional: slowly rotate viewcube for testing
+  // Sync viewCubeCamera orientation with main camera
+  viewCubeCamera.position.copy(camera.position);
+  viewCubeCamera.quaternion.copy(camera.quaternion);
+  viewCubeCamera.updateProjectionMatrix();
+
+  viewCubeRenderer.render(viewCubeScene, viewCubeCamera);
 })();
