@@ -5,7 +5,7 @@ import { dispose } from './utils.js';
 import { setupGUI, controllerMap } from './setupGUI.js';
 import { initChatInterface } from './chatInterface.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { ViewCube } from './viewcube.js';
+import { ViewCube } from './ViewCube.js';
 
 /* ---------- renderer / scene ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
